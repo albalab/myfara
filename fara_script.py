@@ -39,8 +39,9 @@ def safe_parse_thoughts_and_action(self, message: Any):
         arguments = candidate.get("arguments")
         if not isinstance(arguments, dict):
             return None
-        candidate.setdefault("name", "computer_use")
-        return candidate
+        result = candidate.copy()
+        result.setdefault("name", "computer_use")
+        return result
 
     def delegate_or_stop(thoughts_text: str, incoming: Any):
         original = getattr(self, "_original_parse_thoughts_and_action", None)
