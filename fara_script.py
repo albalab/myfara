@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import sys
+from typing import Any
 
 # Настройка логирования
 logging.basicConfig(
@@ -10,78 +11,80 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 TRUNCATE_LENGTH = 200
+TOOL_CALL_TAG = "<tool_call>"
+TOOL_CALL_END_TAG = "</tool_call>"
 
 
-def safe_parse_thoughts_and_action(self, message: str):
+def safe_parse_thoughts_and_action(self, message: Any):
     """Parse assistant message into thoughts and action for a FaraAgent instance.
 
     Args:
-        self: Active FaraAgent instance.
-        message: Full assistant response expected to contain a <tool_call> block.
+        self: Active FaraAgent instance (injected via monkey patch).
+        message: Assistant response; strings are parsed for a <tool_call> block, other types are delegated.
 
     Returns:
         Tuple of (thoughts, action dict). Falls back to a stop action when parsing fails.
     """
-    # Делегируем в исходный парсер, если формат сообщения неожиданен
-    if not isinstance(message, str):
-        original = getattr(self, "_original_parse_thoughts_and_action", None)
-        if original:
-            return original(message)
-        return "", {
-            "name": "computer_use",
-            "arguments": {"action": "stop", "thoughts": ""}
-        }
-
-    thoughts = message.strip()
     agent_logger = getattr(self, "logger", logger)
 
-    # Пытаемся найти блок <tool_call>
-    if "<tool_call>" not in message:
-        original = getattr(self, "_original_parse_thoughts_and_action", None)
-        if original:
-            return original(message)
-        agent_logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
-        return thoughts, {
+    def stop_action(thoughts_text: str):
+        return {
             "name": "computer_use",
-            "arguments": {"action": "stop", "thoughts": thoughts}
+            "arguments": {"action": "stop", "thoughts": thoughts_text}
         }
 
-    # Извлекаем JSON из блока <tool_call>
+    def delegate_or_stop(thoughts_text: str, incoming: Any):
+        original = getattr(self, "_original_parse_thoughts_and_action", None)
+        if original:
+            try:
+                return original(incoming)
+            except Exception as exc:
+                agent_logger.exception("Default parser error (%s)", type(exc).__name__)
+                return thoughts_text, stop_action(thoughts_text)
+        return thoughts_text, stop_action(thoughts_text)
+
+    # Delegate to the original parser when the message format is unexpected
+    if not isinstance(message, str):
+        return delegate_or_stop("", message)
+
+    thoughts = message.strip()
+
+    # Extract JSON from the <tool_call> block
+    start = message.find(TOOL_CALL_TAG)
+    if start == -1:
+        agent_logger.warning(f"Response without {TOOL_CALL_TAG}; trying original parser.")
+        return delegate_or_stop(thoughts, message)
+
+    start += len(TOOL_CALL_TAG)
+    end = message.find(TOOL_CALL_END_TAG, start)
+    if end == -1:
+        agent_logger.error(f"Missing closing {TOOL_CALL_END_TAG} tag.")
+        return thoughts, stop_action(thoughts)
+
     try:
-        start = message.index("<tool_call>") + len("<tool_call>")
-        end = message.index("</tool_call>", start)
         tool_call_json = message[start:end].strip()
         action = json.loads(tool_call_json)
     except (json.JSONDecodeError, ValueError) as e:
-        agent_logger.error(f"Не удалось распарсить JSON из tool_call: {e}")
-        return thoughts, {
-            "name": "computer_use",
-            "arguments": {"action": "stop", "thoughts": thoughts}
-        }
+        agent_logger.error(f"Could not parse JSON from tool_call: {e}")
+        return thoughts, stop_action(thoughts)
 
-    # Проверяем, что action содержит обязательные поля
+    # Ensure action contains required fields
     if not isinstance(action, dict):
-        agent_logger.warning("Ответ не является словарем; завершаем с текущими мыслями.")
-        return thoughts, {
-            "name": "computer_use",
-            "arguments": {"action": "stop", "thoughts": thoughts}
-        }
+        agent_logger.warning("Action is not a dictionary; stopping with current thoughts.")
+        return thoughts, stop_action(thoughts)
 
-    # Если в action уже есть 'name' и 'arguments', возвращаем как есть
+    # If action already has 'name' and 'arguments', return as is
     if "name" in action and "arguments" in action:
         return thoughts, action
 
-    # Если есть только 'arguments', добавляем имя по умолчанию
+    # If only 'arguments' is present, add a default name
     if "arguments" in action:
         action.setdefault("name", "computer_use")
         return thoughts, action
 
-    # Иначе завершаем с stop
-    agent_logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
-    return thoughts, {
-        "name": "computer_use",
-        "arguments": {"action": "stop", "thoughts": thoughts}
-    }
+    # Otherwise stop
+    agent_logger.warning("Action is missing arguments; stopping with current thoughts.")
+    return thoughts, stop_action(thoughts)
 
 
 async def main():
