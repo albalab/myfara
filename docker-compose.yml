@@ -1,33 +1,12 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    # Сначала скачаем модель
-    command: >
-      sh -c "
-      ollama serve &
-      sleep 10 &&
-      ollama pull llama3.2:3b &&
-      wait
-      "
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   fara:
     build: .
-    depends_on:
-      ollama:
-        condition: service_healthy
     volumes:
       - ./downloads:/app/downloads
       - ./results:/app
+    networks:
+      - fara-ollama
 
-volumes:
-  ollama_data:
+networks:
+  fara-ollama:
+    external: true

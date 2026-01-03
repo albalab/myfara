@@ -1,11 +1,37 @@
-# MyFara - FARA Agent with Ollama
+# MyFara - FARA Agent with External Ollama
 
-This repository contains a Docker setup to run Microsoft's FARA (Fast Agent for Research Automation) with Ollama LLM integration.
+This repository contains a Docker setup to run Microsoft's FARA (Fast Agent for Research Automation) with external Ollama LLM integration.
 
 ## Prerequisites
 
 - Docker
 - Docker Compose
+- An external Ollama container running and connected to the `fara-ollama` network
+
+## External Ollama Setup
+
+This project uses an external Ollama container that must be running in the `fara-ollama` Docker network. 
+
+### Creating the External Network (if not exists)
+```bash
+docker network create fara-ollama
+```
+
+### Running External Ollama Container
+If you don't have an Ollama container running yet, you can start one:
+```bash
+docker run -d \
+  --name ollama \
+  --network fara-ollama \
+  -p 11434:11434 \
+  -v ollama_data:/root/.ollama \
+  ollama/ollama:latest
+```
+
+Then pull the required model:
+```bash
+docker exec ollama ollama pull llama3.2:3b
+```
 
 ## Quick Start
 
@@ -15,44 +41,40 @@ git clone https://github.com/albalab/myfara.git
 cd myfara
 ```
 
-2. Build and run the containers:
+2. Make sure the external Ollama container is running and connected to `fara-ollama` network
+
+3. Build and run the Fara container:
 ```bash
 docker compose up --build
 ```
 
 This will:
-- Start the Ollama service and download the `llama3.2:3b` model
-- Wait for Ollama to be healthy
-- Start the Fara agent container
+- Build the Fara agent container
+- Connect to the external Ollama service via the `fara-ollama` network
+- Execute the browser automation task
 
 ## Architecture
 
-The setup consists of two Docker services:
+The setup consists of two separate components:
 
-### 1. Ollama Service
-- Runs the Ollama LLM server
-- Automatically downloads the `llama3.2:3b` model on first start
-- Exposes port 11434 for API access
-- Includes healthcheck to ensure service is ready before starting Fara
+### 1. External Ollama Service (managed separately)
+- Runs the Ollama LLM server in a separate container
+- Connected to the `fara-ollama` Docker network
+- Must be running before starting the Fara service
+- Accessible at `http://ollama:11434` within the network
 
-### 2. Fara Service
+### 2. Fara Service (this project)
 - Runs the FARA agent with Playwright browser automation
-- Connects to Ollama using Docker Compose service name (`ollama`)
+- Connects to the external Ollama service via the `fara-ollama` network
 - Executes browser automation tasks with LLM reasoning
 
 ## Configuration
 
 ### Changing the LLM Model
 
-Edit `docker-compose.yml` to use a different Ollama model:
-```yaml
-command: >
-  sh -c "
-  ollama serve &
-  sleep 5 &&
-  ollama pull <your-model-name> &&
-  wait
-  "
+Update the external Ollama container to pull a different model:
+```bash
+docker exec ollama ollama pull <your-model-name>
 ```
 
 And update `fara_script.py`:
@@ -85,17 +107,34 @@ task = "Your browser automation task here"
 
 ## Networking
 
-The containers communicate using Docker Compose's default bridge network:
+The containers communicate using the external `fara-ollama` Docker network:
 - Fara connects to Ollama at `http://ollama:11434/v1`
+- Both containers must be on the same `fara-ollama` network
 - This works on all platforms (Linux, macOS, Windows)
-- No need for `host.docker.internal` or special host networking
 
 ## Troubleshooting
 
 ### Ollama Not Ready
-If you see connection errors, the ollama service might not be fully initialized. The healthcheck should prevent this, but you can manually check:
+If you see connection errors, ensure the external Ollama service is running:
 ```bash
-docker compose logs ollama
+# Check if Ollama container is running
+docker ps | grep ollama
+
+# Check Ollama container logs
+docker logs ollama
+
+# Test Ollama API
+curl http://localhost:11434/api/tags
+```
+
+### Network Issues
+Verify the `fara-ollama` network exists and Ollama is connected:
+```bash
+# List networks
+docker network ls
+
+# Inspect the network
+docker network inspect fara-ollama
 ```
 
 ### Download Directory
@@ -106,9 +145,8 @@ Results are saved to `./results/` and downloads to `./downloads/` on the host ma
 # View all logs
 docker compose logs
 
-# View specific service logs
+# View fara service logs
 docker compose logs fara
-docker compose logs ollama
 
 # Follow logs in real-time
 docker compose logs -f

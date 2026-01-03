@@ -21,7 +21,7 @@ async def main():
         logger.info("Проверьте установку FARA: pip install -e /fara")
         return 1
 
-    # Вариант 1: С Ollama
+    # Вариант 1: С Ollama (используем внешний контейнер из сети fara-ollama)
     client_config = {
         "model": "llama3.2:3b",
         "base_url": "http://ollama:11434/v1",
