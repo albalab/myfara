@@ -1,28 +1,11 @@
 # Базовый образ с Python 3.12
 FROM python:3.12-slim
 
-# Устанавливаем системные зависимости для Playwright
+# Устанавливаем минимальные системные зависимости
 RUN apt-get update && apt-get install -y \
     git \
     wget \
     curl \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2t64 \
-    libatspi2.0-0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,9 +21,8 @@ RUN git clone https://github.com/microsoft/fara.git /fara && \
         beautifulsoup4 \
         lxml
 
-# Инициализируем Playwright (используем версию из FARA)
-RUN playwright install chromium && \
-    playwright install-deps chromium
+# Инициализируем Playwright (установит все необходимые зависимости автоматически)
+RUN playwright install --with-deps chromium
 
 # Рабочая директория
 WORKDIR /app
