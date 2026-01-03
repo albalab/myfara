@@ -1,4 +1,6 @@
 import asyncio
+import ast
+import json
 import logging
 import sys
 
@@ -16,6 +18,57 @@ async def main():
         # Динамический импорт (если FARA не установлен, будет понятная ошибка)
         from fara import FaraAgent
         from fara.browser.browser_bb import BrowserBB
+
+        def _safe_parse_thoughts_and_action(self, message: str):
+            thoughts = message.strip()
+            try:
+                tmp = message.split("<tool_call>\n")
+                if len(tmp) < 2:
+                    self.logger.warning(
+                        "Ответ без <tool_call>; завершаем с текущими мыслями."
+                    )
+                    return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+                thoughts = tmp[0].strip()
+                tool_call_block = tmp[1]
+                if "\n</tool_call>" not in tool_call_block:
+                    self.logger.warning(
+                        "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
+                    )
+                    return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+                action_text = tool_call_block.split("\n</tool_call>")[0]
+                try:
+                    action = json.loads(action_text)
+                except json.decoder.JSONDecodeError:
+                    self.logger.error(f"Invalid action text: {action_text}", exc_info=True)
+                    try:
+                        action = ast.literal_eval(action_text)
+                    except Exception:
+                        self.logger.warning(
+                            "Не удалось распарсить действие; завершаем с текущими мыслями."
+                        )
+                        action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+                if not isinstance(action, dict) or "arguments" not in action:
+                    self.logger.warning(
+                        "Ответ без arguments; завершаем с текущими мыслями."
+                    )
+                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+                elif "action" not in action["arguments"]:
+                    self.logger.warning(
+                        "Ответ без action; завершаем с текущими мыслями."
+                    )
+                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+                return thoughts, action
+            except Exception:
+                self.logger.error(
+                    f"Error parsing thoughts and action: {message}", exc_info=True
+                )
+                return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+        FaraAgent._parse_thoughts_and_action = _safe_parse_thoughts_and_action
     except ImportError as e:
         logger.error(f"Ошибка импорта FARA: {e}")
         logger.info("Проверьте установку FARA: pip install -e /fara")
