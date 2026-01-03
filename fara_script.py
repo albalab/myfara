@@ -33,6 +33,15 @@ def safe_parse_thoughts_and_action(self, message: Any):
             "arguments": {"action": "stop", "thoughts": thoughts_text}
         }
 
+    def normalize_action(candidate: Any):
+        if not isinstance(candidate, dict):
+            return None
+        arguments = candidate.get("arguments")
+        if not isinstance(arguments, dict):
+            return None
+        candidate.setdefault("name", "computer_use")
+        return candidate
+
     def delegate_or_stop(thoughts_text: str, incoming: Any):
         original = getattr(self, "_original_parse_thoughts_and_action", None)
         if original:
@@ -54,13 +63,9 @@ def safe_parse_thoughts_and_action(self, message: Any):
     if start == -1:
         # Try parsing the whole message as JSON action before delegating
         try:
-            parsed = json.loads(message)
-            if isinstance(parsed, dict):
-                if "name" in parsed and "arguments" in parsed:
-                    return thoughts, parsed
-                if "arguments" in parsed:
-                    parsed.setdefault("name", "computer_use")
-                    return thoughts, parsed
+            parsed = normalize_action(json.loads(message))
+            if parsed:
+                return thoughts, parsed
         except (json.JSONDecodeError, ValueError):
             pass
 
@@ -75,23 +80,18 @@ def safe_parse_thoughts_and_action(self, message: Any):
 
     try:
         tool_call_json = message[start:end].strip()
-        action = json.loads(tool_call_json)
+        action = normalize_action(json.loads(tool_call_json))
     except (json.JSONDecodeError, ValueError) as e:
         agent_logger.error(f"Could not parse JSON from tool_call: {e}")
         return thoughts, stop_action(thoughts)
 
-    # Ensure action contains required fields
-    if not isinstance(action, dict):
-        agent_logger.warning("Action is not a dictionary; stopping with current thoughts.")
+    if not action:
+        agent_logger.warning("Action is missing or has invalid arguments; stopping with current thoughts.")
         return thoughts, stop_action(thoughts)
 
+    # Ensure action contains required fields
     # If action already has 'name' and 'arguments', return as is
     if "name" in action and "arguments" in action:
-        return thoughts, action
-
-    # If only 'arguments' is present, add a default name
-    if "arguments" in action:
-        action.setdefault("name", "computer_use")
         return thoughts, action
 
     # Otherwise stop
