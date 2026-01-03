@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 TRUNCATE_LENGTH = 200
 
 
-def safe_parse_thoughts_and_action(agent, message: str):
+def safe_parse_thoughts_and_action(self, message: str):
     """Parse assistant message into thoughts and action for a FaraAgent instance.
 
     Args:
-        agent: Active FaraAgent instance.
+        self: Active FaraAgent instance.
         message: Full assistant response expected to contain a <tool_call> block.
 
     Returns:
         Tuple of (thoughts, action dict). Falls back to a stop action when parsing fails.
     """
     thoughts = message.strip()
-    agent_logger = getattr(agent, "logger", logger)
+    agent_logger = getattr(self, "logger", logger)
     try:
         before_tool, separator, after_tool = message.partition("<tool_call>")
         if not separator:
