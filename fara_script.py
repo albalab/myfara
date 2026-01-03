@@ -23,13 +23,10 @@ async def main():
 
     # Вариант 1: С Ollama (используем внешний контейнер из сети fara-ollama)
     client_config = {
-        "model": "maternion/fara:7b",
+        "model": "llama3.2:3b",
         "base_url": "http://host.docker.internal:11434/v1",
         "api_key": "ollama",
-        "timeout": 30.0,
-        "extra_body": {
-            "format": "json"
-        }
+        "timeout": 30.0
     }
 
     # Вариант 2: Без LLM (только браузер)
