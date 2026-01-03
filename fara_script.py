@@ -12,18 +12,19 @@ logger = logging.getLogger(__name__)
 TRUNCATE_LENGTH = 200
 
 
-def safe_parse_thoughts_and_action(self, message: str):
+def safe_parse_thoughts_and_action(agent, message: str):
     """Parse assistant message into thoughts and action; fall back to stop on malformed input."""
     thoughts = message.strip()
+    agent_logger = getattr(agent, "logger", logger)
     try:
         before_tool, separator, after_tool = message.partition("<tool_call>")
         if not separator:
-            self.logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
+            agent_logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
             return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
         thoughts = before_tool.strip()
         if "</tool_call>" not in after_tool:
-            self.logger.warning(
+            agent_logger.warning(
                 "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
             )
             return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
@@ -34,22 +35,22 @@ def safe_parse_thoughts_and_action(self, message: str):
             action = json.loads(action_text)
         except json.JSONDecodeError:
             truncated_action_text = action_text[:TRUNCATE_LENGTH]
-            self.logger.error(
+            agent_logger.error(
                 f"Invalid action text (truncated): {truncated_action_text}",
                 exc_info=True,
             )
             action = {"arguments": {"action": "stop", "thoughts": thoughts}}
 
         if not isinstance(action, dict) or "arguments" not in action:
-            self.logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
+            agent_logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
             action = {"arguments": {"action": "stop", "thoughts": thoughts}}
         elif "action" not in action["arguments"]:
-            self.logger.warning("Ответ без action; завершаем с текущими мыслями.")
+            agent_logger.warning("Ответ без action; завершаем с текущими мыслями.")
             action = {"arguments": {"action": "stop", "thoughts": thoughts}}
 
         return thoughts, action
     except Exception:
-        self.logger.error(
+        agent_logger.error(
             f"Error parsing thoughts and action: {message[:TRUNCATE_LENGTH]}",
             exc_info=True,
         )
