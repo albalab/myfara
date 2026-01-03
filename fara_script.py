@@ -70,8 +70,8 @@ def safe_parse_thoughts_and_action(self, message: Any):
         except (json.JSONDecodeError, ValueError):
             pass
 
-        agent_logger.warning(f"Response without {TOOL_CALL_TAG}; trying original parser.")
-        return delegate_or_stop(thoughts, message)
+        agent_logger.warning(f"Response without {TOOL_CALL_TAG}; returning stop action.")
+        return thoughts, stop_action(thoughts)
 
     start += len(TOOL_CALL_TAG)
     end = message.find(TOOL_CALL_END_TAG, start)
