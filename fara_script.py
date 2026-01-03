@@ -38,6 +38,7 @@ async def main():
             headless=True,
             viewport_height=900,
             viewport_width=1440,
+            page_script_path=None,
             browser_channel="chromium",
             downloads_folder="/app/downloads",
             single_tab_mode=True
