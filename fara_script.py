@@ -67,12 +67,12 @@ async def main():
         logger.info(f"Ответ: {final_answer[:200]}...")
 
         # Сохраняем результат
-        with open("/app/result.txt", "w") as f:
+        with open("/app/results/result.txt", "w") as f:
             f.write(f"Task: {task}\n")
             f.write(f"Answer: {final_answer}\n")
             f.write(f"Actions: {len(actions)}\n")
 
-        logger.info("Результат сохранен в /app/result.txt")
+        logger.info("Результат сохранен в /app/results/result.txt")
 
     except Exception as e:
         logger.error(f"Ошибка: {e}")

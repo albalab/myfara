@@ -53,6 +53,7 @@ RUN playwright install chromium
 # Рабочая директория
 WORKDIR /app
 RUN mkdir -p /app/downloads && chmod 755 /app/downloads
+RUN mkdir -p /app/results && chmod 755 /app/results
 
 # Копируем скрипт
 COPY fara_script.py /app/

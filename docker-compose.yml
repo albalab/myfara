@@ -3,7 +3,7 @@ services:
     build: .
     volumes:
       - ./downloads:/app/downloads
-      - ./results:/app
+      - ./results:/app/results
     networks:
       - fara-network
 
