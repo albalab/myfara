@@ -123,8 +123,8 @@ async def main():
             "format": "json"
         },
         "options": {
-            "temperature": 0.1,
-            "top_p": 0.9,
+            "temperature": 0.0,
+            "top_p": 0.5,
             "repeat_penalty": 1.05,
         },
         "tools": [
@@ -191,8 +191,16 @@ async def main():
         task = "Go to https://mockup.graphics and return the page title."
         logger.info(f"Выполняем: {task}")
 
-        result = await agent.run(task)
-        final_answer, actions, observations = result
+        max_retries = 2
+        final_answer = ""
+        actions = []
+        observations = []
+        for attempt in range(1, max_retries + 2):
+            result = await agent.run(task)
+            final_answer, actions, observations = result
+            if actions:
+                break
+            logger.warning("Пустые действия; повторный запрос к модели (%s/%s)", attempt, max_retries + 1)
 
         logger.info(f"Задача выполнена! Действий: {len(actions)}")
         logger.info(f"Ответ: {final_answer[:200]}...")
