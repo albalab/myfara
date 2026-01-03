@@ -8,5 +8,7 @@ services:
       - fara-ollama
 
 networks:
+  # Внешняя сеть должна быть создана заранее: docker network create fara-ollama
+  # External network must be created beforehand: docker network create fara-ollama
   fara-ollama:
     external: true
