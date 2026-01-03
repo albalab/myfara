@@ -13,7 +13,15 @@ TRUNCATE_LENGTH = 200
 
 
 def safe_parse_thoughts_and_action(agent, message: str):
-    """Parse assistant message into thoughts and action; fall back to stop on malformed input."""
+    """Parse assistant message into thoughts and action for a FaraAgent instance.
+
+    Args:
+        agent: Active FaraAgent instance.
+        message: Full assistant response expected to contain a <tool_call> block.
+
+    Returns:
+        Tuple of (thoughts, action dict). Falls back to a stop action when parsing fails.
+    """
     thoughts = message.strip()
     agent_logger = getattr(agent, "logger", logger)
     try:
