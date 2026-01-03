@@ -1,5 +1,4 @@
 import asyncio
-import ast
 import json
 import logging
 import sys
@@ -20,17 +19,18 @@ async def main():
         from fara.browser.browser_bb import BrowserBB
 
         def safe_parse_thoughts_and_action(self, message: str):
+            """Parse assistant message into thoughts and action; fall back to stop on malformed input."""
             thoughts = message.strip()
             try:
-                tmp = message.split("<tool_call>\n")
-                if len(tmp) < 2:
+                message_parts = message.split("<tool_call>\n")
+                if len(message_parts) < 2:
                     self.logger.warning(
                         "Ответ без <tool_call>; завершаем с текущими мыслями."
                     )
                     return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
-                thoughts = tmp[0].strip()
-                tool_call_block = tmp[1]
+                thoughts = message_parts[0].strip()
+                tool_call_block = message_parts[1]
                 if "\n</tool_call>" not in tool_call_block:
                     self.logger.warning(
                         "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
@@ -42,13 +42,7 @@ async def main():
                     action = json.loads(action_text)
                 except json.JSONDecodeError:
                     self.logger.error(f"Invalid action text: {action_text}", exc_info=True)
-                    try:
-                        action = ast.literal_eval(action_text)
-                    except (ValueError, SyntaxError):
-                        self.logger.warning(
-                            "Не удалось распарсить действие; завершаем с текущими мыслями."
-                        )
-                        action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
 
                 if not isinstance(action, dict) or "arguments" not in action:
                     self.logger.warning(
