@@ -49,7 +49,7 @@ def safe_parse_thoughts_and_action(self, message: str):
         return thoughts, action
     except Exception:
         self.logger.error(
-            f"Error parsing thoughts and action: {message}", exc_info=True
+            f"Error parsing thoughts and action: {message[:200]}", exc_info=True
         )
         return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
