@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Сначала скачаем модель
+    command: >
+      sh -c "
+      ollama pull llama3.2:3b &&
+      ollama serve
+      "
+
+  fara:
+    build: .
+    depends_on:
+      ollama:
+        condition: service_started
+    volumes:
+      - ./downloads:/app/downloads
+      - ./results:/app
+    # Для Linux/macOS используем network_mode: host
+    # Для Windows Docker Desktop:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  ollama_data:
