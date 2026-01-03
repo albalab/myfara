@@ -24,45 +24,51 @@ def safe_parse_thoughts_and_action(self, message: str):
     """
     thoughts = message.strip()
     agent_logger = getattr(self, "logger", logger)
+
+    # Пытаемся найти блок <tool_call>
+    if "<tool_call>" not in message:
+        agent_logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
+        return thoughts, {
+            "name": "computer_use",
+            "arguments": {"action": "stop", "thoughts": thoughts}
+        }
+
+    # Извлекаем JSON из блока <tool_call>
     try:
-        before_tool, separator, after_tool = message.partition("<tool_call>")
-        if not separator:
-            agent_logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
-            return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+        start = message.index("<tool_call>") + len("<tool_call>")
+        end = message.index("</tool_call>", start)
+        tool_call_json = message[start:end].strip()
+        action = json.loads(tool_call_json)
+    except (json.JSONDecodeError, ValueError) as e:
+        agent_logger.error(f"Не удалось распарсить JSON из tool_call: {e}")
+        return thoughts, {
+            "name": "computer_use",
+            "arguments": {"action": "stop", "thoughts": thoughts}
+        }
 
-        thoughts = before_tool.strip()
-        if "</tool_call>" not in after_tool:
-            agent_logger.warning(
-                "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
-            )
-            return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+    # Проверяем, что action содержит обязательные поля
+    if not isinstance(action, dict):
+        agent_logger.warning("Ответ не является словарем; завершаем с текущими мыслями.")
+        return thoughts, {
+            "name": "computer_use",
+            "arguments": {"action": "stop", "thoughts": thoughts}
+        }
 
-        tool_call_block = after_tool.split("</tool_call>", 1)[0]
-        action_text = tool_call_block.strip()
-        try:
-            action = json.loads(action_text)
-        except json.JSONDecodeError:
-            truncated_action_text = action_text[:TRUNCATE_LENGTH]
-            agent_logger.error(
-                f"Invalid action text (truncated): {truncated_action_text}",
-                exc_info=True,
-            )
-            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-
-        if not isinstance(action, dict) or "arguments" not in action:
-            agent_logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
-            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-        elif "action" not in action["arguments"]:
-            agent_logger.warning("Ответ без action; завершаем с текущими мыслями.")
-            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-
+    # Если в action уже есть 'name' и 'arguments', возвращаем как есть
+    if "name" in action and "arguments" in action:
         return thoughts, action
-    except Exception:
-        agent_logger.error(
-            f"Error parsing thoughts and action: {message[:TRUNCATE_LENGTH]}",
-            exc_info=True,
-        )
-        return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+    # Если есть только 'arguments', добавляем имя по умолчанию
+    if "arguments" in action:
+        action.setdefault("name", "computer_use")
+        return thoughts, action
+
+    # Иначе завершаем с stop
+    agent_logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
+    return thoughts, {
+        "name": "computer_use",
+        "arguments": {"action": "stop", "thoughts": thoughts}
+    }
 
 
 async def main():
@@ -86,7 +92,29 @@ async def main():
         "timeout": 30.0,
         "extra_body": {
             "format": "json"
-        }
+        },
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "computer_use",
+                    "description": "Use a mouse and keyboard to interact with a computer, and take screenshots.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {"type": "string"},
+                            "thoughts": {"type": "string"},
+                            "coordinate": {"type": "array", "items": {"type": "number"}},
+                            "url": {"type": "string"},
+                            "text": {"type": "string"},
+                            "keys": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["action"],
+                        "additionalProperties": True
+                    }
+                }
+            }
+        ]
     }
 
     # Вариант 2: Без LLM (только браузер)
@@ -126,7 +154,7 @@ async def main():
         await agent.initialize()
 
         # Простая задача
-        task = "Go to https://example.com and return the page title."
+        task = "Go to https://mockup.graphics and return the page title."
         logger.info(f"Выполняем: {task}")
 
         result = await agent.run(task)
