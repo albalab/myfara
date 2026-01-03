@@ -19,7 +19,7 @@ async def main():
         from fara import FaraAgent
         from fara.browser.browser_bb import BrowserBB
 
-        def _safe_parse_thoughts_and_action(self, message: str):
+        def safe_parse_thoughts_and_action(self, message: str):
             thoughts = message.strip()
             try:
                 tmp = message.split("<tool_call>\n")
@@ -40,11 +40,11 @@ async def main():
                 action_text = tool_call_block.split("\n</tool_call>")[0]
                 try:
                     action = json.loads(action_text)
-                except json.decoder.JSONDecodeError:
+                except json.JSONDecodeError:
                     self.logger.error(f"Invalid action text: {action_text}", exc_info=True)
                     try:
                         action = ast.literal_eval(action_text)
-                    except Exception:
+                    except (ValueError, SyntaxError):
                         self.logger.warning(
                             "Не удалось распарсить действие; завершаем с текущими мыслями."
                         )
@@ -68,7 +68,7 @@ async def main():
                 )
                 return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
-        FaraAgent._parse_thoughts_and_action = _safe_parse_thoughts_and_action
+        FaraAgent._parse_thoughts_and_action = safe_parse_thoughts_and_action
     except ImportError as e:
         logger.error(f"Ошибка импорта FARA: {e}")
         logger.info("Проверьте установку FARA: pip install -e /fara")
