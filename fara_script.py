@@ -122,6 +122,11 @@ async def main():
         "extra_body": {
             "format": "json"
         },
+        "options": {
+            "temperature": 0.1,
+            "top_p": 0.9,
+            "repeat_penalty": 1.05,
+        },
         "tools": [
             {
                 "type": "function",
