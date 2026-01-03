@@ -9,6 +9,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+TRUNCATE_LENGTH = 200
 
 
 def safe_parse_thoughts_and_action(self, message: str):
@@ -32,7 +33,7 @@ def safe_parse_thoughts_and_action(self, message: str):
         try:
             action = json.loads(action_text)
         except json.JSONDecodeError:
-            truncated_action_text = action_text[:200]
+            truncated_action_text = action_text[:TRUNCATE_LENGTH]
             self.logger.error(
                 f"Invalid action text (truncated): {truncated_action_text}",
                 exc_info=True,
@@ -49,7 +50,8 @@ def safe_parse_thoughts_and_action(self, message: str):
         return thoughts, action
     except Exception:
         self.logger.error(
-            f"Error parsing thoughts and action: {message[:200]}", exc_info=True
+            f"Error parsing thoughts and action: {message[:TRUNCATE_LENGTH]}",
+            exc_info=True,
         )
         return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
