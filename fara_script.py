@@ -62,7 +62,13 @@ async def main():
         from fara import FaraAgent
         from fara.browser.browser_bb import BrowserBB
 
-        FaraAgent._parse_thoughts_and_action = safe_parse_thoughts_and_action
+        if hasattr(FaraAgent, "_parse_thoughts_and_action"):
+            FaraAgent._original_parse_thoughts_and_action = (
+                FaraAgent._parse_thoughts_and_action
+            )
+            FaraAgent._parse_thoughts_and_action = safe_parse_thoughts_and_action
+        else:
+            logger.warning("Не удалось найти _parse_thoughts_and_action для патча.")
     except ImportError as e:
         logger.error(f"Ошибка импорта FARA: {e}")
         logger.info("Проверьте установку FARA: pip install -e /fara")
