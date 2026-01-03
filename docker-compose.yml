@@ -5,10 +5,10 @@ services:
       - ./downloads:/app/downloads
       - ./results:/app/results
     networks:
-      - fara-ollama
+      - fara-network
 
 networks:
-  # Внешняя сеть должна быть создана заранее: docker network create fara-ollama
-  # External network must be created beforehand: docker network create fara-ollama
-  fara-ollama:
+  # Внешняя сеть должна быть создана заранее: docker network create fara-network
+  # External network must be created beforehand: docker network create fara-network
+  fara-network:
     external: true
