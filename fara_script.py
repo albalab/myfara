@@ -52,6 +52,18 @@ def safe_parse_thoughts_and_action(self, message: Any):
     # Extract JSON from the <tool_call> block
     start = message.find(TOOL_CALL_TAG)
     if start == -1:
+        # Try parsing the whole message as JSON action before delegating
+        try:
+            parsed = json.loads(message)
+            if isinstance(parsed, dict):
+                if "name" in parsed and "arguments" in parsed:
+                    return thoughts, parsed
+                if "arguments" in parsed:
+                    parsed.setdefault("name", "computer_use")
+                    return thoughts, parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
         agent_logger.warning(f"Response without {TOOL_CALL_TAG}; trying original parser.")
         return delegate_or_stop(thoughts, message)
 
