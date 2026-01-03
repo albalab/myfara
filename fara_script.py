@@ -26,7 +26,10 @@ async def main():
         "model": "maternion/fara:7b",
         "base_url": "http://host.docker.internal:11434/v1",
         "api_key": "ollama",
-        "timeout": 30.0
+        "timeout": 30.0,
+        "extra_body": {
+            "format": "json"
+        }
     }
 
     # Вариант 2: Без LLM (только браузер)
