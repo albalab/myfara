@@ -10,6 +10,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def safe_parse_thoughts_and_action(self, message: str):
+    """Parse assistant message into thoughts and action; fall back to stop on malformed input."""
+    thoughts = message.strip()
+    try:
+        before_tool, separator, after_tool = message.partition("<tool_call>")
+        if not separator:
+            self.logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
+            return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+        thoughts = before_tool.strip()
+        if "</tool_call>" not in after_tool:
+            self.logger.warning(
+                "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
+            )
+            return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+        tool_call_block = after_tool.split("</tool_call>", 1)[0]
+        action_text = tool_call_block.strip()
+        try:
+            action = json.loads(action_text)
+        except json.JSONDecodeError:
+            truncated_action_text = action_text[:200]
+            self.logger.error(
+                f"Invalid action text (truncated): {truncated_action_text}",
+                exc_info=True,
+            )
+            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+        if not isinstance(action, dict) or "arguments" not in action:
+            self.logger.warning("Ответ без arguments; завершаем с текущими мыслями.")
+            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+        elif "action" not in action["arguments"]:
+            self.logger.warning("Ответ без action; завершаем с текущими мыслями.")
+            action = {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+        return thoughts, action
+    except Exception:
+        self.logger.error(
+            f"Error parsing thoughts and action: {message}", exc_info=True
+        )
+        return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
+
+
 async def main():
     logger.info("Запуск FARA...")
 
@@ -17,50 +61,6 @@ async def main():
         # Динамический импорт (если FARA не установлен, будет понятная ошибка)
         from fara import FaraAgent
         from fara.browser.browser_bb import BrowserBB
-
-        def safe_parse_thoughts_and_action(self, message: str):
-            """Parse assistant message into thoughts and action; fall back to stop on malformed input."""
-            thoughts = message.strip()
-            try:
-                message_parts = message.split("<tool_call>\n")
-                if len(message_parts) < 2:
-                    self.logger.warning(
-                        "Ответ без <tool_call>; завершаем с текущими мыслями."
-                    )
-                    return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
-
-                thoughts = message_parts[0].strip()
-                tool_call_block = message_parts[1]
-                if "\n</tool_call>" not in tool_call_block:
-                    self.logger.warning(
-                        "Ответ без закрывающего </tool_call>; завершаем с текущими мыслями."
-                    )
-                    return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
-
-                action_text = tool_call_block.split("\n</tool_call>")[0]
-                try:
-                    action = json.loads(action_text)
-                except json.JSONDecodeError:
-                    self.logger.error(f"Invalid action text: {action_text}", exc_info=True)
-                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-
-                if not isinstance(action, dict) or "arguments" not in action:
-                    self.logger.warning(
-                        "Ответ без arguments; завершаем с текущими мыслями."
-                    )
-                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-                elif "action" not in action["arguments"]:
-                    self.logger.warning(
-                        "Ответ без action; завершаем с текущими мыслями."
-                    )
-                    action = {"arguments": {"action": "stop", "thoughts": thoughts}}
-
-                return thoughts, action
-            except Exception:
-                self.logger.error(
-                    f"Error parsing thoughts and action: {message}", exc_info=True
-                )
-                return thoughts, {"arguments": {"action": "stop", "thoughts": thoughts}}
 
         FaraAgent._parse_thoughts_and_action = safe_parse_thoughts_and_action
     except ImportError as e:
