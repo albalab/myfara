@@ -10,22 +10,26 @@ services:
     # Сначала скачаем модель
     command: >
       sh -c "
+      ollama serve &
+      sleep 5 &&
       ollama pull llama3.2:3b &&
-      ollama serve
+      wait
       "
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   fara:
     build: .
     depends_on:
       ollama:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ./downloads:/app/downloads
       - ./results:/app
-    # Для Linux/macOS используем network_mode: host
-    # Для Windows Docker Desktop:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 volumes:
   ollama_data:
