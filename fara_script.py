@@ -24,7 +24,7 @@ async def main():
     # Вариант 1: С Ollama (используем внешний контейнер из сети fara-ollama)
     client_config = {
         "model": "llama3.2:3b",
-        "base_url": "http://ollama:11434/v1",
+        "base_url": "http://host.docker.internal:11434/v1",
         "api_key": "ollama",
         "timeout": 30.0
     }
