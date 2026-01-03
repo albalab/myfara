@@ -11,12 +11,12 @@ services:
     command: >
       sh -c "
       ollama serve &
-      sleep 5 &&
+      sleep 10 &&
       ollama pull llama3.2:3b &&
       wait
       "
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 10s
       timeout: 5s
       retries: 5
