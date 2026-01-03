@@ -22,11 +22,24 @@ def safe_parse_thoughts_and_action(self, message: str):
     Returns:
         Tuple of (thoughts, action dict). Falls back to a stop action when parsing fails.
     """
+    # Делегируем в исходный парсер, если формат сообщения неожиданен
+    if not isinstance(message, str):
+        original = getattr(self, "_original_parse_thoughts_and_action", None)
+        if original:
+            return original(message)
+        return "", {
+            "name": "computer_use",
+            "arguments": {"action": "stop", "thoughts": ""}
+        }
+
     thoughts = message.strip()
     agent_logger = getattr(self, "logger", logger)
 
     # Пытаемся найти блок <tool_call>
     if "<tool_call>" not in message:
+        original = getattr(self, "_original_parse_thoughts_and_action", None)
+        if original:
+            return original(message)
         agent_logger.warning("Ответ без <tool_call>; завершаем с текущими мыслями.")
         return thoughts, {
             "name": "computer_use",
