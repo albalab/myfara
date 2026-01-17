@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import sys
+import json
 
 # Настройка логирования
 logging.basicConfig(
@@ -83,6 +84,28 @@ async def main():
         logger.error(f"Ошибка импорта FARA: {e}")
         logger.info("Проверьте установку FARA: pip install -e /fara")
         return 1
+
+    # Монки-патч парсинга: возвращаем безопасное действие, если формат ответа не содержит <tool_call>
+    def _safe_parse_thoughts_and_action(self, message: str):
+        if "<tool_call>" not in message or "</tool_call>" not in message:
+            thoughts = message.strip()
+            action = {"arguments": {"action": "terminate", "status": "failure", "thoughts": thoughts}}
+            return thoughts, action
+        try:
+            tmp = message.split("<tool_call>\n")
+            thoughts = tmp[0].strip()
+            action_text = tmp[1].split("\n</tool_call>")[0]
+            try:
+                action = json.loads(action_text)
+            except json.decoder.JSONDecodeError:
+                action = eval(action_text)
+            return thoughts, action
+        except Exception:
+            thoughts = message.strip()
+            action = {"arguments": {"action": "terminate", "status": "failure", "thoughts": thoughts}}
+            return thoughts, action
+
+    FaraAgent._parse_thoughts_and_action = _safe_parse_thoughts_and_action
 
     # Вариант 1: С Ollama (используем внешний контейнер из сети fara-ollama)
     client_config = {
